@@ -65,7 +65,7 @@ class ThreadingSimpleServer(ThreadingMixIn, HTTPServer):
         else:
             try:
                 return super(ThreadingSimpleServer, self).__getattr__(name)
-            except:
+            except Exception:
                 raise AttributeError(name)
         return self.__dict__[name]
 
@@ -115,7 +115,7 @@ class RangeRequestHandler(SimpleHTTPRequestHandler):
         if "Range" in self.headers:
             try:
                 self.range = parse_byte_range(self.headers["Range"])
-            except ValueError as e:
+            except ValueError:
                 self.send_error(400, "Invalid byte range")
                 return None
             first, last = self.range
@@ -204,7 +204,7 @@ class RangeRequestHandler(SimpleHTTPRequestHandler):
             self.send_header("Accept-Ranges", "bytes")
             self.end_headers()
             return f
-        except:
+        except Exception:
             f.close()
             raise
 
@@ -258,7 +258,7 @@ class RangeRequestHandler(SimpleHTTPRequestHandler):
 
         def itemf(v):
             (name, st) = v
-            fullname = join(path, name)
+            # fullname = join(path, name)
             mode = st.st_mode
             displayname = linkname = name
             # Append / for directories or @ for symbolic links
@@ -301,7 +301,7 @@ def serve_dir(env):
     out = stderr.write
     env.setdefault("port", int(environ.get("PORT", 8058)))
     env.setdefault("bind", "0.0.0.0")
-    if env.get("byte_range", True):
+    if env.get("byte_range") is not False:
         if env.get("cgi", True):
 
             class CGIRangeRequestHandler(CGIHTTPRequestHandler, RangeRequestHandler):
@@ -327,7 +327,7 @@ def serve_dir(env):
         Handler = SimpleHTTPRequestHandler
     httpd = ThreadingSimpleServer((env["bind"], env["port"]), Handler)
     from os import getcwd, chdir
-    from os.path import realpath, exists, dirname, join, abspath
+    from os.path import realpath, dirname, abspath
 
     d = realpath(abspath(__file__))
     info("res {!r}".format(d))

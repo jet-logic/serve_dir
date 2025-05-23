@@ -6,7 +6,6 @@ import time
 import requests
 import os
 from tempfile import gettempdir
-import serve_dir
 from serve_dir.server import parse_byte_range
 
 
@@ -100,6 +99,10 @@ class TestServeDirCommand(unittest.TestCase):
             response = requests.get(f"http://localhost:{self.PORT}/test.txt", headers=headers)
             self.assertEqual(response.status_code, 206)  # Partial content
             self.assertEqual(response.text, "Hello"[0:5])
+            headers = {"Range": "bytes=100000-400000"}
+            response = requests.get(f"http://localhost:{self.PORT}/test.txt", headers=headers)
+            self.assertEqual(response.status_code, 416)  # Range Not Satisfiable
+
         finally:
             process.send_signal(signal.SIGINT)
             process.wait()

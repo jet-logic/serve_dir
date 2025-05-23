@@ -12,9 +12,13 @@ def get_file_stream(path):
 
 
 class Segments(object):
+    length = 0
+    pos = 0
+
     def __init__(self, src):
         from os.path import realpath, abspath, dirname
 
+        self.length = 0
         self.pos = 0
         with open(src, "rb") as h:
             from json import load
@@ -22,15 +26,19 @@ class Segments(object):
             m = load(h)
             folder = dirname(realpath(abspath(src)))
             self.length = m["length"]
-            self.parts = sorted(
-                [x[0], x[1], resolve_source(x[2], folder), None] for x in m["parts"]
-            )
-        from sys import stdout
+            self.parts = sorted([x[0], x[1], resolve_source(x[2], folder), None] for x in m["parts"])
+        from os import environ
 
-        self.log = stdout.write
+        x = environ.get("SEGMENTS_DEBUG")
+        if x:
+            from sys import stdout
+
+            self.log = stdout.write
+        else:
+            self.log = lambda *x: None
 
     def tell(self):
-        assert self.pos < self.length
+        # assert self.pos < self.length
         assert self.pos >= 0
         return self.pos
 
@@ -48,10 +56,14 @@ class Segments(object):
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        pass
+        for x in self.parts:
+            (_, _, _, f) = x
+            if f:
+                # self.log(f"close {x[0:3]}\n")
+                f.close()
 
     def seek(self, offset, whence=0):
-        assert self.pos < self.length
+        # assert self.pos < self.length
         assert self.pos >= 0
         if whence == 0:
             assert offset < self.length
@@ -69,34 +81,103 @@ class Segments(object):
             assert 0
         return new_pos
 
-    def read(self, n):
-        pos = self.pos
+    def read(self, n=-1):
         out = self.log
-        assert pos >= 0
+        if n == 0:
+            return b""
+        elif n < 0:  # Read until EOF if n is negative
+            n = self.length - self.pos
+
+        out(f"read n={n}\n")
+        # pos = self.pos
+        assert self.pos >= 0
+        result: bytearray | None = None
         for x in self.parts:
+            out(f"parts {x!r} n={n} pos={self.pos}\n")
             (s, e, path, f) = x
             assert e > s
-            if pos >= s and pos < e:
-                seek = pos - s
-                size = min(e - pos, n)
+            if self.pos >= s and self.pos < e:
+                seek = self.pos - s
+                size = min(e - self.pos, n)
                 if not f:
                     out("OPEN %s-%s %r\n" % (x[0], x[1], x[2]))
                     x[3] = f = open(path, "rb")
                 f.seek(seek)
                 b = f.read(size)
                 size = len(b)
-                pos += size
+                self.pos += size
                 n -= size
-                self.pos = pos
-                return b
+                out("RET %r\n" % ((self.pos, n, b, size),))
+                if result is None:
+                    result = bytearray()
+                result.extend(b)
+                # return b
             else:
                 if f:
                     out("done %s-%s %r\n" % (x[0], x[1], x[3]))
                     x[3] = f.close() and None
-        out("hole %s-%s\n" % (pos, pos + n))
-        pos += n
-        self.pos = pos
-        return b"\x00" * n
+        if result is None:
+            if self.pos < self.length:
+                size = min(self.length - self.pos, n)
+                self.pos += size
+                return b"\x00" * size
+            return b""
+        else:
+            return bytes(result)
+        # out("hole %s-%s\n" % (pos, pos + n))
+        # pos += n
+        # self.pos = pos
+        # return b"\x00" * n
+
+    # def read(self, n=-1):
+    #     out = self.log
+    #     out(f"read n={n} \n")
+    #     if n == 0:
+    #         return b""
+    #     if n < 0:  # Read until EOF if n is negative
+    #         n = self.length - self.pos
+
+    #     remaining = n
+    #     result = bytearray()
+
+    #     while remaining > 0 and self.pos < self.length:
+    #         found_segment = False
+
+    #         for segment in self.parts:
+    #             start, end, path, file_obj = segment
+    #             out(f"parts {self.pos} {start}-{end} {path}, \n")
+    #             if self.pos >= start and self.pos < end:
+    #                 # Calculate how much to read from this segment
+    #                 segment_pos = self.pos - start
+    #                 read_size = min(end - self.pos, remaining)
+
+    #                 # Open file if not already open
+    #                 if file_obj is None:
+    #                     out(f"OPEN {start}-{end} {path}\n")
+    #                     segment[3] = file_obj = open(path, "rb")
+
+    #                 # Seek and read
+    #                 file_obj.seek(segment_pos)
+    #                 data = file_obj.read(read_size)
+    #                 out(f"SNR segment_pos:{segment_pos} read_size:{read_size} {data!r}\n")
+    #                 if not data:  # EOF reached unexpectedly
+    #                     break
+
+    #                 result.extend(data)
+    #                 self.pos += len(data)
+    #                 remaining -= len(data)
+    #                 found_segment = True
+    #                 break
+
+    #         if not found_segment:
+    #             # Handle hole (unmapped range)
+    #             hole_size = min(remaining, self.length - self.pos)
+    #             out(f"hole {self.pos}-{self.pos + hole_size}\n")
+    #             result.extend(b"\x00" * hole_size)
+    #             self.pos += hole_size
+    #             remaining -= hole_size
+
+    #     return bytes(result)
 
 
 from os.path import isabs, abspath, normpath, join

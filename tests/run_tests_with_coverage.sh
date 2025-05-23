@@ -3,10 +3,10 @@
 NAME=$(basename $(realpath .))
 DOCS=/tmp/"$NAME"_coverage
 export COVERAGE_FILE=/tmp/."$NAME"_coverage
-echo @@ [$NAME] $DOCS $COVERAGE_FILE
+echo @@ "<$NAME>"
 rm -f "$COVERAGE_FILE"*
 rm -rf $DOCS
-
+# export PYTEST_DEBUG=1
 # Run tests with coverage
 python -m pytest tests/ \
   --cov=$NAME \

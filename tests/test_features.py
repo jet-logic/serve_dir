@@ -1,10 +1,13 @@
 #!/bin/env python3
+import signal
 import unittest
 import subprocess
 import time
 import requests
 import os
 from tempfile import gettempdir
+import serve_dir
+from serve_dir.server import parse_byte_range
 
 
 class TestServeDirCommand(unittest.TestCase):
@@ -33,14 +36,7 @@ class TestServeDirCommand(unittest.TestCase):
         print(f"\nExecuting: {' '.join(cmd)}")
 
         # Start the server in a subprocess
-        process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            cwd=self.TEST_DIR,
-        )
-
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=self.TEST_DIR)
         # Wait a bit for server to start
         time.sleep(2)
 
@@ -64,7 +60,7 @@ class TestServeDirCommand(unittest.TestCase):
             response = requests.get(f"http://localhost:{self.PORT}/test.txt")
             self.assertEqual(response.text, "Hello World")
         finally:
-            process.terminate()
+            process.send_signal(signal.SIGINT)
             process.wait()
 
     # @unittest.skip
@@ -78,7 +74,7 @@ class TestServeDirCommand(unittest.TestCase):
             self.assertIn("test.html", response.text)
             self.assertEqual(response.status_code, 200)
         finally:
-            process.terminate()
+            process.send_signal(signal.SIGINT)
             process.wait()
 
     # @unittest.skip
@@ -91,7 +87,7 @@ class TestServeDirCommand(unittest.TestCase):
             self.assertIn("test.txt", response.text)
             self.assertIn("test.html", response.text)
         finally:
-            process.terminate()
+            process.send_signal(signal.SIGINT)
             process.wait()
 
     # @unittest.skip
@@ -101,13 +97,11 @@ class TestServeDirCommand(unittest.TestCase):
         try:
             # Test range request
             headers = {"Range": "bytes=0-4"}
-            response = requests.get(
-                f"http://localhost:{self.PORT}/test.txt", headers=headers
-            )
+            response = requests.get(f"http://localhost:{self.PORT}/test.txt", headers=headers)
             self.assertEqual(response.status_code, 206)  # Partial content
             self.assertEqual(response.text, "Hello"[0:5])
         finally:
-            process.terminate()
+            process.send_signal(signal.SIGINT)
             process.wait()
 
     # @unittest.skip
@@ -120,8 +114,12 @@ class TestServeDirCommand(unittest.TestCase):
             response = requests.get(f"http://localhost:{self.PORT}")
             self.assertEqual(response.status_code, 200)
         finally:
-            process.terminate()
+            process.send_signal(signal.SIGINT)
             process.wait()
+
+    def test_extra(self):
+        a, b = parse_byte_range("bytes=123-456")
+        self.assertEqual((a, b), (123, 456))
 
 
 if __name__ == "__main__":

@@ -111,73 +111,19 @@ class Segments(object):
                 if result is None:
                     result = bytearray()
                 result.extend(b)
-                # return b
             else:
                 if f:
                     out("done %s-%s %r\n" % (x[0], x[1], x[3]))
                     x[3] = f.close() and None
         if result is None:
             if self.pos < self.length:
+                # out("hole %s-%s\n" % (pos, pos + n))
                 size = min(self.length - self.pos, n)
                 self.pos += size
                 return b"\x00" * size
             return b""
         else:
             return bytes(result)
-        # out("hole %s-%s\n" % (pos, pos + n))
-        # pos += n
-        # self.pos = pos
-        # return b"\x00" * n
-
-    # def read(self, n=-1):
-    #     out = self.log
-    #     out(f"read n={n} \n")
-    #     if n == 0:
-    #         return b""
-    #     if n < 0:  # Read until EOF if n is negative
-    #         n = self.length - self.pos
-
-    #     remaining = n
-    #     result = bytearray()
-
-    #     while remaining > 0 and self.pos < self.length:
-    #         found_segment = False
-
-    #         for segment in self.parts:
-    #             start, end, path, file_obj = segment
-    #             out(f"parts {self.pos} {start}-{end} {path}, \n")
-    #             if self.pos >= start and self.pos < end:
-    #                 # Calculate how much to read from this segment
-    #                 segment_pos = self.pos - start
-    #                 read_size = min(end - self.pos, remaining)
-
-    #                 # Open file if not already open
-    #                 if file_obj is None:
-    #                     out(f"OPEN {start}-{end} {path}\n")
-    #                     segment[3] = file_obj = open(path, "rb")
-
-    #                 # Seek and read
-    #                 file_obj.seek(segment_pos)
-    #                 data = file_obj.read(read_size)
-    #                 out(f"SNR segment_pos:{segment_pos} read_size:{read_size} {data!r}\n")
-    #                 if not data:  # EOF reached unexpectedly
-    #                     break
-
-    #                 result.extend(data)
-    #                 self.pos += len(data)
-    #                 remaining -= len(data)
-    #                 found_segment = True
-    #                 break
-
-    #         if not found_segment:
-    #             # Handle hole (unmapped range)
-    #             hole_size = min(remaining, self.length - self.pos)
-    #             out(f"hole {self.pos}-{self.pos + hole_size}\n")
-    #             result.extend(b"\x00" * hole_size)
-    #             self.pos += hole_size
-    #             remaining -= hole_size
-
-    #     return bytes(result)
 
 
 from os.path import isabs, abspath, normpath, join
